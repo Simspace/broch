@@ -219,7 +219,7 @@ brochServer config@Config {..} approvalPage authenticatedUser authenticateUser =
 
     userInfoHandler = withBearerToken decodeAccessToken [OpenID] $ \g -> do
         -- TODO: Handle missing client situation
-        Just client <- loadClient (granteeId g)
+        client <- maybe (error "failed to load client") pure =<< loadClient (granteeId g)
         userInfo    <- liftIO $ getUserInfo (fromJust (granterId g)) client
 
         case userInfo of
@@ -240,7 +240,7 @@ brochServer config@Config {..} approvalPage authenticatedUser authenticateUser =
     approvalHandler = withAuthenticatedUser authenticatedUser $ \s -> httpMethod >>= \m -> case m of
         GET -> do
             now    <- liftIO getPOSIXTime
-            Just client <- queryParam "client_id" >>= loadClient
+            client <- maybe (error "failed to load client") pure =<< loadClient =<< queryParam "client_id"
             scope  <- fmap (map scopeFromName . T.splitOn " ") (queryParam "scope")
             html $ approvalPage client scope (round now)
 
