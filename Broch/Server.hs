@@ -218,15 +218,15 @@ brochServer config@Config {..} approvalPage authenticatedUser authenticateUser =
             Right _            -> invalidMetaData "Client registration data must be a JSON Object"
 
     userInfoHandler = withBearerToken decodeAccessToken [OpenID] $ \g -> do
-        client <- loadClient (granteeId g)
-        case client of
+        maybeClient <- loadClient (granteeId g)
+        case maybeClient of
             Nothing -> status internalServerError500 >> text "Client not found"
-            Just c -> do
-                userInfo <- liftIO $ getUserInfo (fromJust (granterId g)) c
+            Just client -> do
+                userInfo <- liftIO $ getUserInfo (fromJust (granterId g)) client
 
                 case userInfo of
                     Nothing -> status internalServerError500 >> text "User not found"
-                    Just ui -> claimsResponse c $ scopedClaims (grantScope g) ui
+                    Just ui -> claimsResponse client $ scopedClaims (grantScope g) ui
 
     claimsResponse client claims =
         case userInfoAlgs client of
@@ -242,13 +242,13 @@ brochServer config@Config {..} approvalPage authenticatedUser authenticateUser =
     approvalHandler = withAuthenticatedUser authenticatedUser $ \s -> httpMethod >>= \m -> case m of
         GET -> do
             now    <- liftIO getPOSIXTime
-            client <- queryParam "client_id" >>= loadClient
-            case client of
+            maybeClient <- queryParam "client_id" >>= loadClient
+            case maybeClient of
                 -- This should really use an error page
                 Nothing -> status internalServerError500 >> text "Client not found"
-                Just c -> do
+                Just client -> do
                     scope  <- fmap (map scopeFromName . T.splitOn " ") (queryParam "scope")
-                    html $ approvalPage c scope (round now)
+                    html $ approvalPage client scope (round now)
 
         POST -> do
             clntId    <- postParam "client_id"
